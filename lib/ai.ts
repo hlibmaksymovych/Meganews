@@ -23,6 +23,9 @@ interface HFResponse {
 }
 
 export async function checkWithAI(text: string, url?: string): Promise<AnalysisResult> {
+  // First try local analysis as it's faster and more reliable
+  const localResult = analyzeLocal(text);
+  
   try {
     const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
       method: "POST",
@@ -31,20 +34,18 @@ export async function checkWithAI(text: string, url?: string): Promise<AnalysisR
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        model: "microsoft/Phi-3-mini-128k-instruct",
         messages: [
           {
             role: "system",
-            content: `Analyze text and return JSON with clickbait score 0-100.
+            content: `You are a news analyzer. Return JSON only: {"clickbait":0-100,"serious":100-value,"emotion":"neutral","reason":"brief","highlights":[],"triggers":[]}
 
-Format: {"clickbait":0-100,"serious":100-value,"emotion":"neutral","reason":"...","highlights":[],"triggers":[]}
-
-Score rules:
-- betting/money on war/conflict = 95-100
-- fake news/propaganda/myths = 90-100
-- sensational conspiracy = 85-100
-- factual news/studies/events = 0-30
-- plane crashes/serious incidents = 0-20`
+Rules:
+- clickbait + serious = 100
+- betting/money on war = 90-100
+- fake news/myths = 80-100
+- factual news = 0-30
+- NO other text`
           },
           {
             role: "user",
@@ -52,7 +53,7 @@ Score rules:
           }
         ] as HFMessage[],
         temperature: 0.3,
-        max_tokens: 400
+        max_tokens: 200
       }),
     });
 
@@ -71,7 +72,7 @@ Score rules:
 
   } catch (error) {
     console.warn("AI failed, using fallback:", (error as Error).message);
-    return analyzeLocal(text);
+    return localResult;
   }
 }
 
