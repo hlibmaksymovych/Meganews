@@ -26,15 +26,23 @@ export async function checkWithAI(text: string, url?: string): Promise<AnalysisR
   // First try local analysis as it's faster and more reliable
   const localResult = analyzeLocal(text);
   
+  // Try Groq API first
+  const groqApiKey = process.env.GROQ_API_KEY;
+  
+  if (!groqApiKey) {
+    console.warn("GROQ_API_KEY not set, using local fallback");
+    return localResult;
+  }
+  
   try {
-    const response = await fetch("https://router.huggingface.co/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.HF_TOKEN}`,
+        "Authorization": `Bearer ${groqApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "microsoft/Phi-3-mini-128k-instruct",
+        model: "llama-3.1-70b-versatile",
         messages: [
           {
             role: "system",
@@ -59,7 +67,7 @@ Rules:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn(`HF API error: ${response.status} - ${errorText}`);
+      console.warn(`Groq API error: ${response.status} - ${errorText}`);
       throw new Error(`API error: ${response.status}`);
     }
 
