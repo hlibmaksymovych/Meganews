@@ -48,11 +48,13 @@ export async function checkWithAI(text: string, url?: string): Promise<AnalysisR
             role: "system",
             content: `You are a news analyzer. Return JSON only: {"clickbait":0-100,"serious":100-value,"emotion":"neutral","reason":"brief","highlights":[],"triggers":[]}
 
+IMPORTANT: clickbait + serious MUST equal 100. If clickbait is X, then serious MUST be 100-X.
+
 Rules:
-- clickbait + serious = 100
-- betting/money on war = 90-100
-- fake news/myths = 80-100
-- factual news = 0-30
+- betting/money on war = 90-100 clickbait
+- fake news/myths = 80-100 clickbait
+- factual news = 0-30 clickbait
+- ALWAYS return clickbait + serious = 100
 - NO other text`
           },
           {
@@ -182,8 +184,19 @@ function parseAIResponse(content: string | null, originalText: string): Analysis
     }
     clickbait = Math.max(0, Math.min(100, clickbait));
 
-    // serious: IMMER 100 - clickbait
-    let serious = 100 - clickbait;
+    // serious: Check if AI returned correct math
+    let aiSerious = parsed.serious;
+    let calculatedSerious = 100 - clickbait;
+    let serious = 0;
+    
+    // If AI returned serious and clickbait + serious = 100, use it
+    if (typeof aiSerious === "number" && !isNaN(aiSerious) && (clickbait + Math.round(aiSerious)) === 100) {
+      serious = Math.round(aiSerious);
+    } else {
+      // AI returned wrong math - treat as clickbait
+      clickbait = 100;
+      serious = 0;
+    }
 
     // emotion: Optional - default to neutral
     const validEmotions = ['neutral', 'fearful', 'happy', 'sad', 'angry'];
